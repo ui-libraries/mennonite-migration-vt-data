@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset='utf-8' />
+  <title>Mennonite Migration</title>
+  <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+
+  <!-- maplibre-gl.css here -->
+  <link href='https://unpkg.com/maplibre-gl@2.1.7/dist/maplibre-gl.css' rel='stylesheet' />
+  <!-- Rubik font -->
+  <link href="https://fonts.googleapis.com/css?family=Rubik&display=swap" rel="stylesheet">
+
+  <style>
+    /* basic css to style the viewer goes here */
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+
+    /* set styles for the container holding the title and slider */
+    .session {
+      position: absolute;
+      z-index: 1;
+      background-color: rgba(255, 255, 255, 0.5);
+      border-radius: 3px;
+      box-shadow: 0px 0px 0px 1px rgba(0, 0, 0, 0.3);
+      top: 10px;
+      left: 10px;
+      padding: 5px;
+    }
+
+    /* set styles for the container holding the year legend */
+    .container {
+      display: table;
+      width: 100%;
+      margin: 0;
+    }
+
+    /* set font styles for the title */
+    h1 {
+      font-size: 20px;
+      font-family: 'Rubik', sans-serif;
+      padding-bottom: 0px;
+      padding-top: 0px;
+      font-weight: normal;
+    }
+
+    /* set font styles for the identified year */
+    h2 {
+      cursor: pointer;
+      font-size: 14px;
+      font-family: 'Rubik', sans-serif;
+      padding-bottom: 0px;
+      padding-top: 0px;
+      font-weight: normal;
+      width: 50%;
+      text-align: left;
+      display: table-cell;
+    }
+
+    /* define the slider width and change the cursor to a pointer on hover */
+    #slider {
+      cursor: pointer;
+      width: 275px;
+    }
+  </style>
+
+</head>
+
+<body>
+
+  <!-- id the map div -->
+  <div id='map'></div>
+
+  <!-- title and time slider -->
+  <div class='session' id='sliderbar'>
+    <!-- the shown title of the map -->
+    <h1>Mennonite Migration in the Americas</h1>
+    <div class='container'>
+      <!-- the selected year -->
+      <h2>Year: <label id='active-year'>2020</label></h2>
+    </div>
+    <!-- the slider has a range from 1920 to 2020, intervals of 1 year, and an initial value of 2020 -->
+    <input id='slider' class='row' type='range' min='1920' max='2020' step='1' value='2020' />
+  </div>
+
+  <!-- maplibre-gl.js library -->
+  <script src='https://unpkg.com/maplibre-gl@2.1.7/dist/maplibre-gl.js'></script>
+
+  <!-- d3 js -->
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+
+  <script>
+
+    // define the initial slider-selected year and convert it to a number
+    const initYear = Number(document.getElementById('slider').value);
+
+    // update text in the UI
+    document.getElementById('active-year').innerText = initYear;
+
+    const style = {
+      "version": 8,
+      "id": "basic-v2",
+      "name": "Basic",
+      "sources": {
+        'raster-tiles': {
+          'type': 'raster',
+          'tiles': [
+            'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png'
+          ],
+          'tileSize': 256,
+          'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        },
+        "colonies": {
+          "type": "vector",
+          "tiles": [location.origin+"/vtiles/colonies/colonies-vt/{z}/{x}/{y}.pbf"]
+        },
+        "migration": {
+          "type": "vector",
+          "tiles": [location.origin+"/vtiles/migration/migration-vt/{z}/{x}/{y}.pbf"]
+        }
+      },
+      "layers": [{
+        'id': 'simple-tiles',
+        'type': 'raster',
+        'source': 'raster-tiles',
+        'minzoom': 0,
+        'maxzoom': 20
+      },
+      {
+        "id": "colonies",
+        "type": "fill",
+        "source": "colonies",
+        "source-layer": "colonies",
+        "layout": {
+          "visibility": "visible"
+        },
+        "minzoom": 0,
+        "maxzoom": 9,
+        "paint": {
+          "fill-color":"orange",
+          "fill-opacity": [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            1.0,
+            0.5
+          ]
+        },
+        // filter by showing only the colonies with a numeric Est_date equal to or less than the initYear
+        "filter": ['<=', ['get', 'Est_date'], initYear]
+      },
+      {
+        "id": "migration",
+        "type": "line",
+        "source": "migration",
+        "source-layer": "migration",
+        "minzoom": 0,
+        "maxzoom": 9,        
+        "layout": {
+          "line-cap": "round",
+          "line-join": "round",
+          "visibility": "visible"
+        },
+        "paint": {
+          "line-color": "brown",
+          "line-width": 1,
+        },
+        // filter the lines to show only those with an Est-Year equal to initYear
+        "filter": ['==', ['get', 'Est-Year'], initYear.toString()]
+      } 
+    ],
+      "bearing": 0,
+      "pitch": 0,
+      "center": [0, 0],
+      "zoom": 1
+    }
+
+    // define the map
+    const map = new maplibregl.Map({
+      container: 'map',
+      center: [
+        -80, 0
+      ],
+      zoom: 2,
+      minZoom: 0,
+      maxZoom: 9,
+      style: style
+    }); 
+
+    // add zoom and rotation controls to the map.
+    map.addControl(new maplibregl.NavigationControl());
+
+    // add a scale bar
+    map.addControl(new maplibregl.ScaleControl({
+      position: 'bottom-left',
+      unit: 'imperial' // you can change from imperial to metric, if desired
+    }));
+
+    // create a popup without adding to map
+    let popup = new maplibregl.Popup({
+      closeButton: true,
+      closeOnClick: false
+    });    
+
+    // define initial hover state
+    let hoveredStateId = null;
+    
+    // fire a function on a mousemove and feed it the geojson we gave an id of 'colonies'
+    map.on('mousemove','colonies', (e) => {
+
+      // change the cursor style as a UI indicator.
+      map.getCanvas().style.cursor = 'pointer';
+
+      // reset the hover state id on mousemove so the layer knows when to change opacity
+      if (e.features.length > 0) {
+        if (hoveredStateId !== null) {
+          map.setFeatureState(
+            { source: 'colonies', sourceLayer: 'colonies', id: hoveredStateId },
+            { hover: false }
+          );
+        }
+        hoveredStateId = e.features[0].id;
+        map.setFeatureState(
+          { source: 'colonies', sourceLayer: 'colonies', id: hoveredStateId },
+          { hover: true }
+        );
+      }
+
+      // define the layer properties
+      // with "e.features[0].properties," you have access to all of the properties from the initial geojson layer
+      let props = e.features[0].properties;
+
+      // get the popup defined above
+      popup
+        .setLngLat(e.lngLat) // the location of the cursor
+        .setHTML('<b>' + props.Name + ', Colony, ' + props.Country + '</b><br>Year Established: ' + props.Est_date + '<br>Hectares: ' + props.Area_ha.toFixed(2) + '<br>To open the Global Anabaptist<br>Mennonite Encyclopedia Online<br>page for this colony, <a target="_blank" href="' + props.Article + '">click here</a>') // feed the popup the prop info
+        .addTo(map) // add the popup to the map
+
+    });
+    
+    // when you mouse off the layer...
+    map.on('mouseleave', 'colonies', () => {
+
+      // change the cursor style back to initial setting
+      map.getCanvas().style.cursor = '';
+
+      // reset the hover state id
+      if (hoveredStateId !== null) {
+        map.setFeatureState(
+          { source: 'colonies', sourceLayer: 'colonies', id: hoveredStateId },
+          { hover: false }
+        );
+      }
+      hoveredStateId = null;
+
+      // and remove the popup
+      //popup.remove();
+
+    });
+
+    // listen for a slider input
+    document.getElementById('slider').addEventListener('input', (event) => {
+
+      // define the newly-selected year
+      const year = Number(event.target.value);
+
+      // update text in the UI
+      document.getElementById('active-year').innerText = year;
+
+      map.setFilter('colonies', ['<=', ['get', 'Est_date'], year]);
+      map.setFilter('migration', ['==', ['get', 'Est-Year'], year.toString()]);
+
+    });    
+
+
+  </script>
+
+</body>
